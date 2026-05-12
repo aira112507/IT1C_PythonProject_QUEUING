@@ -40,7 +40,7 @@ class QueueSystemGUI:
         header = ttk.Frame(self.root)
         header.pack(fill=tk.X, padx=10, pady=10)
         ttk.Label(
-            header, text="🏥 QUEUE SYSTEM", font=("Arial", 24, "bold")
+            header, text="🏥 Queue Management System", font=("Arial", 24, "bold")
         ).pack(side=tk.LEFT)
 
         # Main content frame
