@@ -21,7 +21,7 @@ from core.queue_logic import (
 class QueueSystemGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("🏥 Queue System")
+        self.root.title("🏥 Queue Management System")
         self.root.geometry("900x650")
         self.root.resizable(True, True)
         
