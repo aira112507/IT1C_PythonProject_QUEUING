@@ -4,7 +4,7 @@ A Python-based queue management system with database persistence, featuring a co
 
 ## 🚀 Features
 
-- **Multiple Interfaces**: Choose between CLI, GUI, or REST API based on your needs
+- **Multiple Interfaces**: Choose between GUI, or REST API based on your needs
 - **Real-time Queue Management**: Join, call, and complete queue entries instantly
 - **Persistent Storage**: SQLite database ensures data survives system restarts
 - **Full History Tracking**: View complete records of all queue activities
@@ -17,28 +17,37 @@ A Python-based queue management system with database persistence, featuring a co
 
 ```
 Queue System/
-├── main.py                  # CLI entry point
-├── requirements.txt         # Python dependencies
-├── queue_system.db          # SQLite database file (created on first run)
-├── README.md                # Project documentation
-├── core/                    # Shared business logic & data layer
-│   ├── database.py          # SQLite connection and table setup
-│   └── queue_logic.py       # All queue operations (join, call, done, …)
-├── api/                     # Flask REST API
-│   └── server.py            # HTTP endpoints consumed by mobile / web clients
-├── ui/                      # Tkinter desktop GUI
-│   └── ui_admin.py          # Admin GUI (join, call next, history, stats, …)
-└── tests/                   # Unit tests
-    └── test_fixes.py        # Test suite
+├── documentation/          # Project documentation
+│   ├── flowchart.md        # System logic flowchart
+│   └── pseudocode.md       # Algorithm pseudocode
+├── images/                 # Visual assets
+├── source/                 # Application source code
+│   ├── main.py             # CLI entry point
+│   ├── requirements.txt    # Python dependencies
+│   ├── queue_system.db     # SQLite database file (created on first run)
+│   ├── core/               # Shared business logic & data layer
+│   │   ├── database.py     # SQLite connection and table setup
+│   │   ├── exceptions.py   # Custom exception classes
+│   │   └── queue_logic.py  # All queue operations (join, call, done, …)
+│   ├── api/                # Flask REST API
+│   │   └── server.py       # HTTP endpoints consumed by mobile / web clients
+│   ├── ui/                 # Tkinter desktop GUI
+│   │   └── ui_admin.py     # Admin GUI (join, call next, history, stats, …)
+│   └── tests/              # Unit tests
+│       ├── test_fixes.py   
+│       └── test_queue_logic.py
+└── README.md               
 ```
 
-### 📦 Module Descriptions
+### 📦 Module Descriptions (in `source/`)
 
-- **`core/database.py`** — Manages SQLite connection and creates tables on first run. The database file (`queue_system.db`) is stored at the project root.
+- **`core/database.py`** — Manages SQLite connection and creates tables on first run. The database file (`queue_system.db`) is stored at the `source/` root.
 - **`core/queue_logic.py`** — Pure business-logic functions that return data (no printing). Shared by CLI, API, and GUI to eliminate code duplication.
 - **`api/server.py`** — Flask REST server exposing the queue system over HTTP on port 5000.
 - **`ui/ui_admin.py`** — Tkinter admin GUI with live queue view, history, and statistics tabs.
 - **`main.py`** — Interactive command-line interface with emoji-enhanced menu system.
+- **`core/exceptions.py`** — Custom exceptions used across the application.
+- **`tests/`** — Contains `test_fixes.py` and `test_queue_logic.py` for ensuring system stability.
 
 ## 📋 Requirements
 
@@ -68,6 +77,7 @@ source venv/bin/activate
 
 3. **Install dependencies:**
 ```bash
+cd source
 pip install -r requirements.txt
 ```
 
@@ -80,6 +90,8 @@ The database will be automatically created on first run. No additional setup nee
 The CLI provides an interactive menu with the following options:
 
 ```bash
+# Ensure you are in the source directory
+cd source
 python main.py
 ```
 
@@ -97,6 +109,8 @@ python main.py
 A user-friendly graphical interface with multiple tabs:
 
 ```bash
+# Ensure you are in the source directory
+cd source
 python -m ui.ui_admin
 ```
 
@@ -112,10 +126,21 @@ python -m ui.ui_admin
 Expose the queue system over HTTP for integration with mobile apps, web dashboards, or other services:
 
 ```bash
+# Ensure you are in the source directory
+cd source
 python -m api.server
 ```
 
 The server listens on `http://0.0.0.0:5000`. Other devices on the same network can access it at `http://<YOUR-PC-IP>:5000`.
+
+## 📖 Documentation
+
+- **[Flowchart](documentation/flowchart.md)** — Visual representation of the queue logic.
+- **[Pseudocode](documentation/pseudocode.md)** — Detailed breakdown of the core algorithms.
+
+### 🖼️ System Overview
+
+![Queue System Flowchart](images/660760099_1451449826451550_460241189104459575_n.jpg)
 
 #### 🔗 API Endpoints
 
