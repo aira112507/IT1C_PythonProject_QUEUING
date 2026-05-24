@@ -5,18 +5,16 @@ import tempfile
 import unittest
 
 # Make the project importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-import core.database as db
-from core.queue_logic import (
+import source.core.database as db
+from source.core.queue_logic import (
     join_queue,
     call_next,
     mark_done,
     count_waiting,
     get_all_records,
-    get_serving,
     clear_all_records,
-    get_stats,
 )
 
 
@@ -161,7 +159,7 @@ class TestAdminAuth(unittest.TestCase):
         db.DB_PATH = self._tmp.name
         db.create_tables()
 
-        from api.server import app
+        from source.api.server import app
         self.app = app
         self.client = app.test_client()
 
@@ -178,7 +176,7 @@ class TestAdminAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
 
     def test_next_with_valid_key(self):
-        from api.server import ADMIN_API_KEY
+        from source.api.server import ADMIN_API_KEY
         # No one is waiting so expect 404, but auth should pass
         resp = self.client.post("/next", headers={"X-API-Key": ADMIN_API_KEY})
         self.assertIn(resp.status_code, (200, 404))

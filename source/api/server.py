@@ -16,8 +16,8 @@ import os
 from functools import wraps
 
 from flask import Flask, request, jsonify
-from core.database import create_tables
-from core.queue_logic import (
+from source.core.database import create_tables
+from source.core.queue_logic import (
     join_queue,
     call_next,
     mark_done,

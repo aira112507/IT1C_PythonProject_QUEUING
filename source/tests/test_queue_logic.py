@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from core.queue_logic import QueueService
-from core.exceptions import QueueError, QueueFullError
+from source.core.queue_logic import QueueService
+from source.core.exceptions import QueueError, QueueFullError
 
 
 @dataclass

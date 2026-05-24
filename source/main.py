@@ -24,7 +24,7 @@ class QueueSystemGUI:
         self.root.title("🏥 Queue Management System")
         self.root.geometry("900x650")
         self.root.resizable(True, True)
-        
+
         self.server_process = None
         self.server_button = None
 
@@ -270,14 +270,14 @@ class QueueSystemGUI:
             server_path = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)), "api", "server.py"
             )
-            
+
             # Start the server as a subprocess
             self.server_process = subprocess.Popen(
                 [sys.executable, server_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            
+
             self.server_button.config(text="⏹️  Stop Server", style="")
             messagebox.showinfo(
                 "Server Started", "✅ Flask server is running on http://0.0.0.0:5000"
@@ -360,7 +360,7 @@ def main():
     create_tables()
     root = tk.Tk()
     app = QueueSystemGUI(root)
-    
+
     def on_closing():
         """Handle graceful shutdown."""
         if app.server_process is not None:
@@ -370,7 +370,7 @@ def main():
             except:
                 app.server_process.kill()
         root.destroy()
-    
+
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 
