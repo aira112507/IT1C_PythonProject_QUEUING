@@ -1,6 +1,8 @@
+```mermaid
 flowchart TD
     A([START]) --> B[Initialize Database]
     B --> C[Show Main Menu]
+```
 
     C --> D{What does\nthe user choose?}
 
