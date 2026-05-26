@@ -1,10 +1,15 @@
 # Queue System
 
-A Python-based queue management system with database persistence, featuring a command-line interface, a desktop GUI, and a REST API. Perfect for managing customer queues in retail, healthcare, service centers, and more.
+A Python-based queue management system with database persistence, featuring a command-line interface and a REST API. Perfect for managing customer queues in retail, healthcare, service centers, and more.
 
-## 🚀 Features
+## Group Members
+- [Justine Dela Peña](https://github.com/justine0806/My-fort-folio)
+- [Jex Malibiran](https://github.com/Yukihira-Kurozawa/My-Profile-)
+- [Jeremih Gianzon](https://github.com/daylighttg/IT1C_Portfolio_Gianzon)
+- [Zyrenne Lucero](https://github.com/dokidawn/dokidawn)
+## Features
 
-- **Multiple Interfaces**: Choose between GUI, or REST API based on your needs
+- **Multiple Interfaces**: Choose between CLI or REST API based on your needs
 - **Real-time Queue Management**: Join, call, and complete queue entries instantly
 - **Persistent Storage**: SQLite database ensures data survives system restarts
 - **Full History Tracking**: View complete records of all queue activities
@@ -13,13 +18,13 @@ A Python-based queue management system with database persistence, featuring a co
 - **Network Access**: API server accessible from any device on your network
 - **Zero Configuration**: Works out of the box with no database setup required
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Queue System/
 ├── documentation/          # Project documentation
 │   ├── flowchart.md        # System logic flowchart
-│   └── pseudocode.md       # Algorithm pseudocode
+│   └── pseudocode.md       # Pseudocode
 ├── images/                 # Visual assets
 ├── source/                 # Application source code
 │   ├── main.py             # CLI entry point
@@ -28,35 +33,31 @@ Queue System/
 │   ├── core/               # Shared business logic & data layer
 │   │   ├── database.py     # SQLite connection and table setup
 │   │   ├── exceptions.py   # Custom exception classes
-│   │   └── queue_logic.py  # All queue operations (join, call, done, …)
+│   │   └── queue_logic.py  # All queue operations (join, call, done, ...)
 │   ├── api/                # Flask REST API
 │   │   └── server.py       # HTTP endpoints consumed by mobile / web clients
-│   ├── ui/                 # Tkinter desktop GUI
-│   │   └── ui_admin.py     # Admin GUI (join, call next, history, stats, …)
 │   └── tests/              # Unit tests
 │       ├── test_fixes.py   
 │       └── test_queue_logic.py
 └── README.md               
 ```
 
-### 📦 Module Descriptions (in `source/`)
+### Module Descriptions (in `source/`)
 
 - **`core/database.py`** — Manages SQLite connection and creates tables on first run. The database file (`queue_system.db`) is stored at the `source/` root.
-- **`core/queue_logic.py`** — Pure business-logic functions that return data (no printing). Shared by CLI, API, and GUI to eliminate code duplication.
+- **`core/queue_logic.py`** — Pure business-logic functions that return data (no printing). Shared by CLI and API to eliminate code duplication.
 - **`api/server.py`** — Flask REST server exposing the queue system over HTTP on port 5000.
-- **`ui/ui_admin.py`** — Tkinter admin GUI with live queue view, history, and statistics tabs.
-- **`main.py`** — Interactive command-line interface with emoji-enhanced menu system.
+- **`main.py`** — Interactive command-line interface with menu system.
 - **`core/exceptions.py`** — Custom exceptions used across the application.
 - **`tests/`** — Contains `test_fixes.py` and `test_queue_logic.py` for ensuring system stability.
 
-## 📋 Requirements
+## Requirements
 
 - Python 3.7 or higher
 - Flask 2.3.3+ (for the API server only)
-- Tkinter (usually included with Python installations)
 - SQLite3 (included with Python)
 
-## ⚙️ Installation
+## Installation
 
 1. **Clone the repository:**
 ```bash
@@ -83,7 +84,7 @@ pip install -r requirements.txt
 
 The database will be automatically created on first run. No additional setup needed!
 
-## 🎯 Usage
+## Usage
 
 ### Command-line Interface (CLI)
 
@@ -96,30 +97,13 @@ python main.py
 ```
 
 **Features:**
-- 🎫 Join Queue - Add customers with automatic ticket generation
-- 📢 Call Next Customer - Move the next person from waiting to serving
-- ✅ Mark Customer as Done - Complete service for current customer
-- 📋 View Waiting Queue - See all customers currently waiting
-- 📊 View Full History - Browse complete queue records
-- 🗑️ Delete Record - Remove specific entries
-- 🧹 Clear All Records - Reset the entire system
-
-### Desktop GUI (Tkinter)
-
-A user-friendly graphical interface with multiple tabs:
-
-```bash
-# Ensure you are in the source directory
-cd source
-python -m ui.ui_admin
-```
-
-**Features:**
-- Live queue display with auto-refresh
-- One-click queue operations
-- History browser with search/filter
-- Real-time statistics dashboard
-- Visual queue status indicators
+- Join Queue - Add customers with automatic ticket generation
+- Call Next Customer - Move the next person from waiting to serving
+- Mark Customer as Done - Complete service for current customer
+- View Waiting Queue - See all customers currently waiting
+- View Full History - Browse complete queue records
+- Delete Record - Remove specific entries
+- Clear All Records - Reset the entire system
 
 ### REST API Server
 
@@ -131,18 +115,18 @@ cd source
 python -m api.server
 ```
 
-The server listens on `http://0.0.0.0:5000`. Other devices on the same network can access it at `http://<YOUR-PC-IP>:5000`.
+The server listens on `http://0.0.0.0:5000`. Other devices on the same network can access it at `http://<YOUR-IP>:5000`.
 
-## 📖 Documentation
+## Documentation
 
 - **[Flowchart](documentation/flowchart.md)** — Visual representation of the queue logic.
 - **[Pseudocode](documentation/pseudocode.md)** — Detailed breakdown of the core algorithms.
 
-### 🖼️ System Overview
+### System Overview
 
-![Queue System Flowchart](images/660760099_1451449826451550_460241189104459575_n.jpg)
+![Queue System Flowchart](images/Screenshot.png)
 
-#### 🔗 API Endpoints
+#### API Endpoints
 
 | Method | Path       | Description                          | Request Body                  |
 |--------|------------|--------------------------------------|-------------------------------|
@@ -153,7 +137,7 @@ The server listens on `http://0.0.0.0:5000`. Other devices on the same network c
 | POST   | `/done`    | Mark the serving customer as done    | -                             |
 | GET    | `/history` | Full record history                  | -                             |
 
-#### 📡 API Examples
+#### API Examples
 
 **Add a customer to the queue:**
 ```bash
@@ -177,7 +161,7 @@ curl -X POST http://localhost:5000/next
 curl http://localhost:5000/queue
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Database locked error
 If you encounter "database is locked" errors when running multiple interfaces simultaneously, ensure you're not accessing the database from incompatible applications.
@@ -199,7 +183,7 @@ Ensure you've activated your virtual environment and installed all dependencies:
 pip install -r requirements.txt
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Here's how you can help:
 
@@ -211,15 +195,15 @@ Contributions are welcome! Here's how you can help:
 
 Please ensure your code follows the existing style and includes appropriate tests.
 
-## 📄 License
+## License
 
 This project is open source. Please check the repository for license information.
 
-## 👤 Author
+## Author
 
 **[daylighttg](https://github.com/daylighttg)**
 
-## 💬 Support
+## Support
 
 For questions, issues, or feature requests:
 - Open an issue in the [GitHub repository](https://github.com/daylighttg/Queue_Sytem/issues)
@@ -227,5 +211,4 @@ For questions, issues, or feature requests:
 
 ---
 
-**Made with ❤️ for better queue management**
-
+Made with care for better queue management
