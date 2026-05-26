@@ -7,6 +7,8 @@ A Python-based queue management system with database persistence, featuring a co
 - [Jex Malibiran](https://github.com/Yukihira-Kurozawa/My-Profile-)
 - [Jeremih Gianzon](https://github.com/daylighttg/IT1C_Portfolio_Gianzon)
 - [Zyrenne Lucero](https://github.com/dokidawn/dokidawn)
+-[Aira Segovia]
+[](https://github.com/aira112507)
 ## Features
 
 - **Real-time Queue Management**: Join, call, and complete queue entries instantly
