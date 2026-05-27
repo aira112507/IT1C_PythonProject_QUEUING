@@ -22,18 +22,21 @@ CREATE TABLE IF NOT EXISTS customers (
     ticket     TEXT      NOT NULL,
     name       TEXT      NOT NULL,
     status     TEXT      NOT NULL DEFAULT 'waiting',
+    priority   INTEGER   NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """
-SQL_INSERT_CUSTOMER = "INSERT INTO customers (ticket, name, status) VALUES (?, ?, ?)"
+SQL_INSERT_CUSTOMER = "INSERT INTO customers (ticket, name, status, priority) VALUES (?, ?, ?, ?)"
 SQL_UPDATE_TICKET = "UPDATE customers SET ticket = ? WHERE id = ?"
 SQL_SELECT_FIRST_BY_STATUS = (
-    "SELECT id, ticket, name FROM customers WHERE status = ? ORDER BY id ASC LIMIT 1"
+    "SELECT id, ticket, name FROM customers WHERE status = ?"
+    " ORDER BY priority DESC, created_at ASC LIMIT 1"
 )
 SQL_SELECT_EXISTS_BY_STATUS = "SELECT 1 FROM customers WHERE status = ? LIMIT 1"
 SQL_UPDATE_STATUS = "UPDATE customers SET status = ? WHERE id = ?"
 SQL_SELECT_WAITING = (
-    "SELECT ticket, name, created_at FROM customers WHERE status = ? ORDER BY id ASC"
+    "SELECT ticket, name, created_at, priority FROM customers WHERE status = ?"
+    " ORDER BY priority DESC, created_at ASC"
 )
 SQL_SELECT_SERVING = (
     "SELECT ticket, name FROM customers WHERE status = ? ORDER BY id ASC LIMIT 1"
@@ -44,7 +47,9 @@ SQL_SELECT_COUNT_BY_STATUS = "SELECT COUNT(*) FROM customers WHERE status = ?"
 SQL_SELECT_STATUS_COUNTS = "SELECT status, COUNT(*) FROM customers GROUP BY status"
 SQL_SELECT_ID_BY_TICKET = "SELECT id FROM customers WHERE ticket = ?"
 SQL_SELECT_COUNT_WAITING_BEFORE = (
-    "SELECT COUNT(*) FROM customers WHERE status = ? AND id < ?"
+    "SELECT COUNT(*) FROM customers WHERE status = ? AND ("
+    "priority > ? OR (priority = ? AND created_at < ?)"
+    ")"
 )
 SQL_SELECT_RECORD_BY_ID = "SELECT ticket, name FROM customers WHERE id = ?"
 SQL_DELETE_RECORD_BY_ID = "DELETE FROM customers WHERE id = ?"
@@ -53,6 +58,7 @@ SQL_DELETE_ALL_RECORDS = "DELETE FROM customers"
 SQL_SELECT_WAITING_NAME_EXISTS = (
     "SELECT 1 FROM customers WHERE name = ? AND status = ? LIMIT 1"
 )
+SQL_UPDATE_PRIORITY_BY_ID = "UPDATE customers SET priority = ? WHERE id = ?"
 
 DB_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -76,6 +82,17 @@ def _validate_positive_integer(value: int, field_name: str) -> int:
         raise DatabaseError(f"{field_name} must be an integer.")
     if value <= 0:
         raise DatabaseError(f"{field_name} must be greater than zero.")
+    return value
+
+
+VALID_PRIORITY_VALUES = (0, 1, 2)
+
+
+def _validate_priority(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DatabaseError("priority must be an integer.")
+    if value not in VALID_PRIORITY_VALUES:
+        raise DatabaseError(f"priority must be one of {VALID_PRIORITY_VALUES}.")
     return value
 
 
@@ -153,6 +170,7 @@ class QueueRepository:
         waiting_status: str,
         ticket_prefix: str,
         ticket_width: int,
+        priority: int = 0,
     ) -> str:
         """Insert a waiting customer and generate a ticket.
 
@@ -161,6 +179,7 @@ class QueueRepository:
             waiting_status: Status value used for waiting customers.
             ticket_prefix: Prefix used in generated ticket values.
             ticket_width: Width for zero-padded ticket numeric part.
+            priority: Priority level (0=Regular, 1=Priority, 2=VIP). Defaults to 0.
 
         Returns:
             Generated ticket value.
@@ -169,12 +188,13 @@ class QueueRepository:
         normalized_status = _validate_non_empty_string(waiting_status, "waiting_status")
         normalized_prefix = _validate_non_empty_string(ticket_prefix, "ticket_prefix")
         validated_width = _validate_positive_integer(ticket_width, "ticket_width")
+        validated_priority = _validate_priority(priority)
 
         with connect() as connection:
             cursor = connection.cursor()
             cursor.execute(
                 SQL_INSERT_CUSTOMER,
-                (EMPTY_TICKET_VALUE, normalized_name, normalized_status),
+                (EMPTY_TICKET_VALUE, normalized_name, normalized_status, validated_priority),
             )
             customer_id = cursor.lastrowid
             if customer_id is None:
@@ -205,11 +225,14 @@ class QueueRepository:
         normalized_status = _validate_non_empty_string(status, "status")
         self._execute_write(SQL_UPDATE_STATUS, (normalized_status, validated_customer_id))
 
-    def list_waiting(self, waiting_status: str) -> list[tuple[str, str, str]]:
-        """Return waiting rows as (ticket, name, created_at)."""
+    def list_waiting(self, waiting_status: str) -> list[tuple[str, str, str, int]]:
+        """Return waiting rows as (ticket, name, created_at, priority)."""
         normalized_status = _validate_non_empty_string(waiting_status, "waiting_status")
         rows = self._fetch_all(SQL_SELECT_WAITING, (normalized_status,))
-        return [(str(ticket), str(name), str(created_at)) for ticket, name, created_at in rows]
+        return [
+            (str(ticket), str(name), str(created_at), int(priority))
+            for ticket, name, created_at, priority in rows
+        ]
 
     def get_serving(self, serving_status: str) -> tuple[str, str] | None:
         """Return the currently serving row as (ticket, name), if any."""
@@ -256,13 +279,23 @@ class QueueRepository:
             return None
         return int(row[0])
 
-    def count_waiting_before(self, customer_id: int, waiting_status: str) -> int:
-        """Return number of waiting customers ahead of a customer id."""
+    def count_waiting_before(
+        self, customer_id: int, waiting_status: str
+    ) -> int:
+        """Return number of waiting customers ahead of a customer id (priority-aware)."""
         validated_customer_id = _validate_positive_integer(customer_id, "customer_id")
         normalized_status = _validate_non_empty_string(waiting_status, "waiting_status")
+        # Fetch the customer's own priority and created_at to compare correctly.
+        own_row = self._fetch_one(
+            "SELECT priority, created_at FROM customers WHERE id = ?",
+            (validated_customer_id,),
+        )
+        if own_row is None:
+            return 0
+        own_priority, own_created_at = int(own_row[0]), str(own_row[1])
         row = self._fetch_one(
             SQL_SELECT_COUNT_WAITING_BEFORE,
-            (normalized_status, validated_customer_id),
+            (normalized_status, own_priority, own_priority, own_created_at),
         )
         if row is None:
             return 0
@@ -291,6 +324,12 @@ class QueueRepository:
     def clear_all_records(self) -> None:
         """Delete every customer record."""
         self._execute_write(SQL_DELETE_ALL_RECORDS)
+
+    def update_priority_by_id(self, record_id: int, priority: int) -> None:
+        """Update the priority of a record by id."""
+        validated_record_id = _validate_positive_integer(record_id, "record_id")
+        validated_priority = _validate_priority(priority)
+        self._execute_write(SQL_UPDATE_PRIORITY_BY_ID, (validated_priority, validated_record_id))
 
     def exists_waiting_name(self, customer_name: str, waiting_status: str) -> bool:
         """Return whether a customer name is already waiting in the queue."""

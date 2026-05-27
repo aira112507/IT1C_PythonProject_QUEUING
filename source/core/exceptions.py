@@ -16,3 +16,7 @@ class QueueEmptyError(QueueError):
 class DatabaseError(QueueError):
     """Raised when a database operation fails."""
 
+
+class PriorityError(QueueError):
+    """Raised when an invalid priority value is provided."""
+

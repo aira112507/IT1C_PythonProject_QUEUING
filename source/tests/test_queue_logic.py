@@ -20,6 +20,7 @@ class _Record:
     name: str
     status: str
     created_at: str
+    priority: int = 0
 
 
 class MockQueueRepository:
@@ -35,6 +36,7 @@ class MockQueueRepository:
         waiting_status: str,
         ticket_prefix: str,
         ticket_width: int,
+        priority: int = 0,
     ) -> str:
         record_id = self._next_id
         self._next_id += 1
@@ -46,15 +48,18 @@ class MockQueueRepository:
                 name=customer_name,
                 status=waiting_status,
                 created_at="2026-01-01 00:00:00",
+                priority=priority,
             )
         )
         return ticket
 
     def get_first_by_status(self, status: str) -> tuple[int, str, str] | None:
-        for record in self._records:
-            if record.status == status:
-                return record.record_id, record.ticket, record.name
-        return None
+        matching = [r for r in self._records if r.status == status]
+        if not matching:
+            return None
+        matching.sort(key=lambda r: (-r.priority, r.created_at))
+        r = matching[0]
+        return r.record_id, r.ticket, r.name
 
     def any_with_status(self, status: str) -> bool:
         return any(record.status == status for record in self._records)
@@ -65,12 +70,14 @@ class MockQueueRepository:
                 record.status = status
                 return
 
-    def list_waiting(self, waiting_status: str) -> list[tuple[str, str, str]]:
-        return [
-            (record.ticket, record.name, record.created_at)
+    def list_waiting(self, waiting_status: str) -> list[tuple[str, str, str, int]]:
+        rows = [
+            (record.ticket, record.name, record.created_at, record.priority)
             for record in self._records
             if record.status == waiting_status
         ]
+        rows.sort(key=lambda r: (-r[3], r[2]))
+        return rows
 
     def get_serving(self, serving_status: str) -> tuple[str, str] | None:
         for record in self._records:
@@ -106,10 +113,17 @@ class MockQueueRepository:
         return None
 
     def count_waiting_before(self, customer_id: int, waiting_status: str) -> int:
+        own = next((r for r in self._records if r.record_id == customer_id), None)
+        if own is None:
+            return 0
         return sum(
             1
             for record in self._records
-            if record.status == waiting_status and record.record_id < customer_id
+            if record.status == waiting_status
+            and (
+                record.priority > own.priority
+                or (record.priority == own.priority and record.created_at < own.created_at)
+            )
         )
 
     def record_by_id(self, record_id: int) -> tuple[str, str] | None:

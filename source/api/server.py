@@ -54,9 +54,17 @@ def join():
         return jsonify({"error": "Name is required."}), 400
 
     name = data["name"].strip()
-    ticket = join_queue(name)
+    priority = data.get("priority", 0)
+    if not isinstance(priority, int) or isinstance(priority, bool) or priority not in (0, 1, 2):
+        return jsonify({"error": "priority must be 0 (Regular), 1 (Priority), or 2 (VIP)."}), 400
+
+    try:
+        ticket = join_queue(name, priority)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
     position = get_waiting_position(ticket)
-    return jsonify({"ticket": ticket, "name": name, "position": position}), 201
+    return jsonify({"ticket": ticket, "name": name, "priority": priority, "position": position}), 201
 
 
 # ── GET /queue ─────────────────────────────────────────────────
@@ -65,8 +73,8 @@ def queue():
     """Returns the full waiting list."""
     rows = get_waiting()
     waiting = [
-        {"ticket": ticket, "name": name, "position": i, "created_at": created_at}
-        for i, (ticket, name, created_at) in enumerate(rows, start=1)
+        {"ticket": ticket, "name": name, "position": i, "created_at": created_at, "priority": priority}
+        for i, (ticket, name, created_at, priority) in enumerate(rows, start=1)
     ]
     return jsonify({"waiting": waiting, "count": len(waiting)}), 200
 

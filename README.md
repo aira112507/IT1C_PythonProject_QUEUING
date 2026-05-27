@@ -61,8 +61,8 @@ Queue System/
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/daylighttg/Queue_Sytem.git
-cd Queue_Sytem
+git clone https://github.com/daylighttg/IT1C_PythonProject_QUEUING.git Queue_System
+cd Queue_System
 ```
 
 2. **Create a virtual environment (recommended):**

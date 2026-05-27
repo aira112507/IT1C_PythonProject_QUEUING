@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import time
 from typing import Protocol
 
-from .database import get_repository
-from .exceptions import QueueError, QueueFullError
+from .database import get_repository, VALID_PRIORITY_VALUES
+from .exceptions import QueueError, QueueFullError, PriorityError
 
 WAITING_STATUS = "waiting"
 SERVING_STATUS = "serving"
@@ -15,8 +16,9 @@ TICKET_PREFIX = "Q"
 TICKET_NUMBER_WIDTH = 3
 ALLOW_DUPLICATE_WAITING_NAMES = True
 ALREADY_SERVING_MESSAGE = "A customer is already being served. Mark them as done first."
+TIME_DECAY_SECONDS = 600  # 10 minutes
 
-WaitingRow = tuple[str, str, str]
+WaitingRow = tuple[str, str, str, int]  # ticket, name, created_at, priority
 ServingRow = tuple[str, str]
 HistoryRow = tuple[str, str, str, str]
 RecordRow = tuple[int, str, str, str]
@@ -31,6 +33,7 @@ class QueueRepositoryProtocol(Protocol):
         waiting_status: str,
         ticket_prefix: str,
         ticket_width: int,
+        priority: int = 0,
     ) -> str:
         """Insert a customer and return generated ticket."""
 
@@ -43,8 +46,8 @@ class QueueRepositoryProtocol(Protocol):
     def update_status(self, customer_id: int, status: str) -> None:
         """Update status for a customer id."""
 
-    def list_waiting(self, waiting_status: str) -> list[WaitingRow]:
-        """Return waiting rows."""
+    def list_waiting(self, waiting_status: str) -> list[WaitingRow]:  # type: ignore[override]
+        """Return waiting rows as (ticket, name, created_at, priority)."""
 
     def get_serving(self, serving_status: str) -> ServingRow | None:
         """Return currently serving row."""
@@ -78,6 +81,9 @@ class QueueRepositoryProtocol(Protocol):
 
     def clear_all_records(self) -> None:
         """Delete all queue records."""
+
+    def update_priority_by_id(self, record_id: int, priority: int) -> None:
+        """Update the priority of a record by id."""
 
     def exists_waiting_name(self, customer_name: str, waiting_status: str) -> bool:
         """Return whether a waiting record with name exists."""
@@ -129,19 +135,32 @@ class QueueService:
             raise QueueError("Record ID must be greater than zero.")
         return record_id
 
-    def join_queue(self, customer_name: str) -> str:
+    @staticmethod
+    def _validate_priority(priority: int) -> int:
+        if isinstance(priority, bool) or not isinstance(priority, int):
+            raise PriorityError("Priority must be an integer.")
+        if priority not in VALID_PRIORITY_VALUES:
+            raise PriorityError(
+                f"Priority must be one of {VALID_PRIORITY_VALUES}."
+            )
+        return priority
+
+    def join_queue(self, customer_name: str, priority: int = 0) -> str:
         """Add a customer to the queue and return their ticket.
 
         Args:
             customer_name: Customer name to enqueue.
+            priority: Priority level (0=Regular, 1=Priority, 2=VIP). Defaults to 0.
 
         Returns:
             Generated ticket value.
 
         Raises:
             QueueError: If the input is invalid or duplicate names are blocked.
+            PriorityError: If the priority value is invalid.
         """
         validated_name = self._validate_name(customer_name)
+        validated_priority = self._validate_priority(priority)
 
         if (
             not self._allow_duplicate_waiting_names
@@ -154,10 +173,35 @@ class QueueService:
             WAITING_STATUS,
             TICKET_PREFIX,
             TICKET_NUMBER_WIDTH,
+            validated_priority,
         )
 
+    @staticmethod
+    def _apply_time_decay(rows: list[WaitingRow]) -> list[WaitingRow]:
+        """Return rows re-sorted after boosting long-waiting customers by one priority level.
+
+        Args:
+            rows: Waiting rows as (ticket, name, created_at, priority).
+
+        Returns:
+            New list sorted by effective priority DESC then created_at ASC.
+        """
+        now = time.time()
+        decayed: list[tuple[str, str, str, int, int]] = []
+        for ticket, name, created_at, priority in rows:
+            try:
+                import datetime
+                ts = datetime.datetime.fromisoformat(created_at).timestamp()
+            except (ValueError, TypeError):
+                ts = now
+            waited = now - ts
+            effective_priority = min(priority + 1, 2) if waited >= TIME_DECAY_SECONDS else priority
+            decayed.append((ticket, name, created_at, priority, effective_priority))
+        decayed.sort(key=lambda r: (-r[4], r[2]))
+        return [(t, n, c, p) for t, n, c, p, _ in decayed]
+
     def call_next(self) -> ServingRow | None:
-        """Move the next waiting customer to serving.
+        """Move the next waiting customer to serving (priority + time-decay aware).
 
         Returns:
             Tuple of (ticket, name) when a customer is called, or None when queue is empty.
@@ -168,13 +212,17 @@ class QueueService:
         if self._repository.any_with_status(SERVING_STATUS):
             raise QueueFullError(ALREADY_SERVING_MESSAGE)
 
-        next_customer = self._repository.get_first_by_status(WAITING_STATUS)
-        if next_customer is None:
+        waiting_rows = self._repository.list_waiting(WAITING_STATUS)
+        if not waiting_rows:
             return None
 
-        customer_id, ticket, customer_name = next_customer
+        ordered = self._apply_time_decay(waiting_rows)
+        next_ticket = ordered[0][0]
+        customer_id = self._repository.customer_id_by_ticket(next_ticket)
+        if customer_id is None:
+            return None
         self._repository.update_status(customer_id, SERVING_STATUS)
-        return ticket, customer_name
+        return next_ticket, ordered[0][1]
 
     def mark_done(self) -> ServingRow | None:
         """Mark the current serving customer as done.
@@ -191,7 +239,7 @@ class QueueService:
         return ticket, customer_name
 
     def get_waiting(self) -> list[WaitingRow]:
-        """Return waiting customers ordered by arrival."""
+        """Return waiting customers ordered by priority then arrival."""
         return self._repository.list_waiting(WAITING_STATUS)
 
     def get_serving(self) -> ServingRow | None:
@@ -251,6 +299,16 @@ class QueueService:
             self._repository.clear_all_records()
         return total_records
 
+    def edit_record(self, record_id: int, priority: int) -> tuple[str, str] | None:
+        """Update the priority of a record and return its (ticket, name) when found."""
+        validated_record_id = self._validate_record_id(record_id)
+        validated_priority = self._validate_priority(priority)
+        record = self._repository.record_by_id(validated_record_id)
+        if record is None:
+            return None
+        self._repository.update_priority_by_id(validated_record_id, validated_priority)
+        return record
+
 
 _DEFAULT_QUEUE_SERVICE = QueueService(repository=get_repository())
 
@@ -259,9 +317,9 @@ def _service() -> QueueService:
     return _DEFAULT_QUEUE_SERVICE
 
 
-def join_queue(name: str) -> str:
+def join_queue(name: str, priority: int = 0) -> str:
     """Add a customer to the queue and return their ticket."""
-    return _service().join_queue(name)
+    return _service().join_queue(name, priority)
 
 
 def call_next() -> ServingRow | None:
@@ -317,3 +375,8 @@ def delete_record(record_id: int) -> ServingRow | None:
 def clear_all_records() -> int:
     """Delete all records and return deleted row count."""
     return _service().clear_all_records()
+
+
+def edit_record(record_id: int, priority: int) -> tuple[str, str] | None:
+    """Update the priority of a record and return (ticket, name) when found."""
+    return _service().edit_record(record_id, priority)

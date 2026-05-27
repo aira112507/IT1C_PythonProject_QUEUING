@@ -15,6 +15,7 @@ from core.queue_logic import (
     delete_record,
     clear_all_records,
     get_stats,
+    edit_record,
 )
 
 
@@ -63,6 +64,10 @@ class QueueSystemGUI:
         ttk.Button(
             left_panel, text="✅ Mark as Done", width=button_width,
             command=self.mark_done_action,
+        ).pack(pady=5, fill=tk.X)
+        ttk.Button(
+            left_panel, text="✏️  Edit Record", width=button_width,
+            command=self.edit_record_dialog,
         ).pack(pady=5, fill=tk.X)
         ttk.Button(
             left_panel, text="🗑️  Delete Record", width=button_width,
@@ -124,21 +129,65 @@ class QueueSystemGUI:
         scrollbar.config(command=text_widget.yview)
         return text_widget
 
+    def _format_priority(self, priority: int) -> str:
+        if priority == 2:
+            return "VIP"
+        if priority == 1:
+            return "Priority"
+        return "Regular"
+
     # ── Actions ───────────────────────────────────────────────
     def join_queue_dialog(self):
         """Opens a dialog to add a new customer to the queue."""
-        name = simpledialog.askstring("Join Queue", "Enter customer name:")
-        if name and name.strip():
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Join Queue")
+        dialog.geometry("350x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Customer name:").pack(padx=10, pady=(10, 2), anchor=tk.W)
+        name_var = tk.StringVar()
+        name_entry = ttk.Entry(dialog, textvariable=name_var, width=30)
+        name_entry.pack(padx=10, pady=2, fill=tk.X)
+        name_entry.focus_set()
+
+        ttk.Label(dialog, text="Priority:").pack(padx=10, pady=(10, 2), anchor=tk.W)
+        priority_var = tk.StringVar(value="Regular")
+        priority_options = ("Regular", "Priority", "VIP")
+        priority_combo = ttk.Combobox(
+            dialog, textvariable=priority_var, values=priority_options, state="readonly"
+        )
+        priority_combo.pack(padx=10, pady=2, fill=tk.X)
+
+        def submit():
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showwarning("Warning", "Name cannot be empty.")
+                return
+            priority_label = priority_var.get()
+            priority_map = {"Regular": 0, "Priority": 1, "VIP": 2}
+            priority = priority_map.get(priority_label, 0)
             try:
-                ticket = join_queue(name.strip())
+                ticket = join_queue(name, priority)
                 messagebox.showinfo(
-                    "Success", f"🎫 Welcome {name.strip()}!\nYour ticket is {ticket}"
+                    "Success", f"🎫 Welcome {name}!\nYour ticket is {ticket}"
                 )
                 self.refresh_display()
+                dialog.destroy()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to join queue: {e}")
-        elif name is not None:
-            messagebox.showwarning("Warning", "Name cannot be empty.")
+
+        def cancel():
+            dialog.destroy()
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=10)
+        ttk.Button(button_frame, text="Join", command=submit).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=cancel).pack(side=tk.LEFT, padx=5)
+
+        dialog.bind("<Return>", lambda _event: submit())
+        dialog.bind("<Escape>", lambda _event: cancel())
 
     def call_next_action(self):
         """Calls the next customer in the queue."""
@@ -170,6 +219,77 @@ class QueueSystemGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to mark customer as done: {e}")
 
+    def edit_record_dialog(self):
+        """Opens a window listing records; the selected one can have its priority edited."""
+        try:
+            rows = get_all_records()
+            if not rows:
+                messagebox.showinfo("Edit", "📭 No records found.")
+                return
+
+            edit_window = tk.Toplevel(self.root)
+            edit_window.title("Edit Record Priority")
+            edit_window.geometry("500x450")
+            edit_window.transient(self.root)
+            edit_window.grab_set()
+            ttk.Label(
+                edit_window, text="Select a record to edit:",
+                font=("Arial", 10, "bold"),
+            ).pack(padx=10, pady=5)
+
+            scrollbar = ttk.Scrollbar(edit_window)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            listbox = tk.Listbox(
+                edit_window, yscrollcommand=scrollbar.set, font=("Courier", 9)
+            )
+            listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+            scrollbar.config(command=listbox.yview)
+
+            record_ids = []
+            for row in rows:
+                record_id, ticket, name, status = row[:4]
+                record_ids.append(record_id)
+                listbox.insert(
+                    tk.END, f"ID: {record_id}  |  {ticket}  |  {name}  |  {status.upper()}"
+                )
+
+            ttk.Label(edit_window, text="New Priority:").pack(padx=10, pady=(5, 2), anchor=tk.W)
+            priority_var = tk.StringVar(value="Regular")
+            priority_combo = ttk.Combobox(
+                edit_window, textvariable=priority_var,
+                values=("Regular", "Priority", "VIP"), state="readonly", width=20,
+            )
+            priority_combo.pack(padx=10, pady=2, anchor=tk.W)
+
+            def save_selected():
+                selection = listbox.curselection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select a record to edit.")
+                    return
+                record_id = record_ids[selection[0]]
+                priority_map = {"Regular": 0, "Priority": 1, "VIP": 2}
+                priority = priority_map[priority_var.get()]
+                try:
+                    result = edit_record(record_id, priority)
+                    if result is None:
+                        messagebox.showwarning("Warning", "Record no longer exists.")
+                    else:
+                        ticket, name = result
+                        messagebox.showinfo(
+                            "Success",
+                            f"✅ {name} ({ticket}) priority updated to {priority_var.get()}.",
+                        )
+                    self.refresh_display()
+                    edit_window.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to edit record: {e}")
+
+            ttk.Button(
+                edit_window, text="Save Changes", command=save_selected
+            ).pack(pady=10)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open edit dialog: {e}")
+
     def delete_record_dialog(self):
         """Opens a window listing records; the selected one can be deleted."""
         try:
@@ -195,7 +315,8 @@ class QueueSystemGUI:
             scrollbar.config(command=listbox.yview)
 
             record_ids = []
-            for record_id, ticket, name, status in rows:
+            for row in rows:
+                record_id, ticket, name, status = row[:4]
                 record_ids.append(record_id)
                 listbox.insert(
                     tk.END, f"ID: {record_id}  |  {ticket}  |  {name}  |  {status.upper()}"
@@ -312,10 +433,18 @@ class QueueSystemGUI:
             # Waiting queue tab
             waiting_rows = get_waiting()
             if waiting_rows:
-                self.waiting_text.insert(tk.END, "--- 🕐 Waiting Queue ---\n\n")
-                for ticket, name, created_at in waiting_rows:
+                self.waiting_text.insert(
+                    tk.END, "--- 🕐 Waiting Queue ---\n\n"
+                    "Ticket  |  Name  |  Priority  |  Created\n"
+                    "----------------------------------------\n"
+                )
+                for row in waiting_rows:
+                    ticket, name, created_at = row[:3]
+                    priority = row[3] if len(row) > 3 else 0
+                    priority_label = self._format_priority(priority)
                     self.waiting_text.insert(
-                        tk.END, f"{ticket}  |  {name}  |  {created_at}\n"
+                        tk.END,
+                        f"{ticket}  |  {name}  |  {priority_label}  |  {created_at}\n",
                     )
                 self.waiting_text.insert(tk.END, f"\nTotal waiting: {len(waiting_rows)}\n")
             else:
@@ -327,7 +456,8 @@ class QueueSystemGUI:
             history_rows = get_history()
             if history_rows:
                 self.history_text.insert(tk.END, "--- 📋 Full History ---\n\n")
-                for ticket, name, status, created_at in history_rows:
+                for row in history_rows:
+                    ticket, name, status, created_at = row[:4]
                     self.history_text.insert(
                         tk.END, f"{ticket}  |  {name}  |  {status.upper()}  |  {created_at}\n"
                     )
