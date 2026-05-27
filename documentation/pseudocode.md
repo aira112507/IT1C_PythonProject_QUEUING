@@ -1,198 +1,199 @@
-# Queue System Pseudocode
+# Queue System - Explained in Simple Terms
 
-This document describes the queue system business logic in pseudocode form. It matches the behavior implemented by `source/core/queue_logic.py` and the underlying repository layer.
+This document breaks down how the queue system works. It's basically like a ticket system at the bank or DMV—people join, get served, and then they're done!
 
-## Status Constants
+---
 
-- `WAITING_STATUS = "waiting"`
-- `SERVING_STATUS = "serving"`
-- `DONE_STATUS = "done"`
-- `TICKET_PREFIX = "Q"`
-- `TICKET_NUMBER_WIDTH = 3`
+## The Basics
 
-## Repository Interface
+Here are the three states a customer can be in:
 
-The queue service depends on a repository that supports these operations:
+- `WAITING_STATUS = "waiting"` — They're in line, waiting for their turn
+- `SERVING_STATUS = "serving"` — They're being helped right now
+- `DONE_STATUS = "done"` — They're finished and done
+- `TICKET_PREFIX = "Q"` — All tickets start with the letter "Q" (like Q001, Q002, etc.)
+- `TICKET_NUMBER_WIDTH = 3` — Tickets are padded to 3 digits
 
-- `enqueue_customer(name, status, prefix, width) -> ticket`
-- `get_first_by_status(status) -> record | None`
-- `any_with_status(status) -> bool`
-- `update_status(id, status) -> None`
-- `list_waiting(status) -> list`
-- `get_serving(status) -> row | None`
-- `list_history() -> list`
-- `list_all_records() -> list`
-- `count_by_status(status) -> int`
-- `status_counts() -> list[(status, count)]`
-- `customer_id_by_ticket(ticket) -> id | None`
-- `count_waiting_before(id, status) -> int`
-- `record_by_id(id) -> (ticket, name) | None`
-- `delete_by_id(id) -> None`
-- `count_records() -> int`
-- `clear_all_records() -> None`
-- `exists_waiting_name(name, status) -> bool`
+---
 
-## Common Validation
+## What the Database Can Do
 
-```pseudocode
-function validate_name(name):
-    if type(name) is not string:
-        raise QueueError("Customer name must be a string.")
-    normalized = name.strip()
-    if normalized is empty:
-        raise QueueError("Customer name cannot be empty.")
-    return normalized
+The system needs a way to store and retrieve customer info. Here are the things we ask the database to do:
 
-function validate_ticket(ticket):
-    if type(ticket) is not string:
-        raise QueueError("Ticket must be a string.")
-    normalized = ticket.strip()
-    if normalized is empty:
-        raise QueueError("Ticket cannot be empty.")
-    return normalized
+- **Add a customer** to the queue with their name and status
+- **Find the first person** waiting or being served
+- **Check if anyone** is in a particular status
+- **Change someone's status** (like from waiting to serving)
+- **Show me** all the people waiting
+- **Tell me** who's currently being served
+- **Show me** the history of completed customers
+- **Count how many** people are waiting
+- **Get statistics** about all status groups
+- **Find a customer** by their ticket number
+- **Tell me** how many people are ahead in line
+- **Look up** a customer's ticket and name
+- **Remove** a customer record
+- **Count everything** in the database
+- **Wipe the slate clean** and delete all records
+- **Check if** someone with the same name is already waiting
 
-function validate_record_id(record_id):
-    if type(record_id) is not int or type(record_id) is bool:
-        raise QueueError("Record ID must be an integer.")
-    if record_id <= 0:
-        raise QueueError("Record ID must be greater than zero.")
-    return record_id
+---
+
+## Checking That Input Makes Sense
+
+Before we do anything, we need to make sure the data is good:
+
+```
+When someone gives us a name:
+    - Is it actually text? (not a number or something weird)
+    - Remove any extra spaces from the start/end
+    - Is it empty? Nope, not allowed!
+    - If all checks pass, use the cleaned-up name
+
+When someone gives us a ticket number:
+    - Is it text?
+    - Clean up any extra spaces
+    - Can't be empty!
+    - If good, we're ready to use it
+
+When someone gives us a customer ID number:
+    - Must actually be a whole number (not text, not true/false)
+    - Can't be zero or negative—must be a real ID number
+    - If it checks out, we're good to go
 ```
 
-## Join Queue
+---
 
-```pseudocode
-function join_queue(customer_name):
-    validated_name = validate_name(customer_name)
+## Joining the Queue
 
-    if duplicates_are_not_allowed and repository.exists_waiting_name(validated_name, WAITING_STATUS):
-        raise QueueError(validated_name + " is already waiting in the queue.")
+Here's what happens when a new customer arrives:
 
-    ticket = repository.enqueue_customer(
-        validated_name,
-        WAITING_STATUS,
-        TICKET_PREFIX,
-        TICKET_NUMBER_WIDTH,
-    )
-
-    return ticket
+```
+When a customer wants to join the queue:
+    1. Clean up their name (remove spaces, check it's valid)
+    2. If we don't allow duplicates, check if they're already waiting
+    3. If they are already there, tell them "sorry, you're already in line!"
+    4. If not, give them a ticket number and mark them as "waiting"
+    5. Give them their ticket so they know where they are in line
 ```
 
-## Call Next Customer
+---
 
-```pseudocode
-function call_next():
-    if repository.any_with_status(SERVING_STATUS):
-        raise QueueFullError("A customer is already being served. Mark them as done first.")
+## Calling the Next Customer
 
-    next_customer = repository.get_first_by_status(WAITING_STATUS)
-    if next_customer is None:
-        return None
+Time to serve someone!
 
-    id, ticket, name = next_customer
-    repository.update_status(id, SERVING_STATUS)
-    return (ticket, name)
+```
+When we call the next customer:
+    1. First, check if someone is already being served
+    2. If yes, tell the staff member "finish with this customer first!"
+    3. If no one is being served, find the first person waiting
+    4. If no one's waiting either, say "the queue is empty"
+    5. When you find them, change their status from "waiting" to "serving"
+    6. Tell the staff who they are and their ticket number
 ```
 
-## Mark Current Customer Done
+---
 
-```pseudocode
-function mark_done():
-    serving_customer = repository.get_first_by_status(SERVING_STATUS)
-    if serving_customer is None:
-        return None
+## Marking a Customer as Done
 
-    id, ticket, name = serving_customer
-    repository.update_status(id, DONE_STATUS)
-    return (ticket, name)
+When the service is finished:
+
+```
+When a customer is finished:
+    1. Find whoever is currently being served
+    2. If no one is being served, there's nothing to do—say "no one being served"
+    3. When you find them, change their status from "serving" to "done"
+    4. Log their info so we know they were here
 ```
 
-## Query Functions
+---
 
-```pseudocode
-function get_waiting():
-    return repository.list_waiting(WAITING_STATUS)
+## Looking Up Information
 
-function get_serving():
-    return repository.get_serving(SERVING_STATUS)
+These are quick ways to check the queue:
 
-function get_history():
-    return repository.list_history()
-
-function get_all_records():
-    return repository.list_all_records()
-
-function count_waiting():
-    return repository.count_by_status(WAITING_STATUS)
+```
+Show me everyone waiting right now
+Show me who's currently being served
+Show me the history of everyone who was served today
+Show me absolutely everyone (waiting, serving, and done)
+Tell me the total number of people waiting
 ```
 
-## Statistics
+---
 
-```pseudocode
-function get_stats():
-    counts = {
-        WAITING_STATUS: 0,
-        SERVING_STATUS: 0,
-        DONE_STATUS: 0,
-    }
-    total = 0
+## Getting the Big Picture
 
-    for status, count in repository.status_counts():
-        total += count
-        if status in counts:
-            counts[status] = count
+Here's how we create a summary of what's happening:
 
-    counts["total"] = total
-    return counts
+```
+When we want statistics:
+    1. Create a counter that starts at 0 for each status
+    2. Go through all the customers in the database
+    3. Add them up by their status (waiting, serving, done)
+    4. Calculate the total of everyone
+    5. Return a nice summary showing all the numbers
 ```
 
-## Get Waiting Position
+---
 
-```pseudocode
-function get_waiting_position(ticket):
-    validated_ticket = validate_ticket(ticket)
-    customer_id = repository.customer_id_by_ticket(validated_ticket)
-    if customer_id is None:
-        return 0
-    return repository.count_waiting_before(customer_id, WAITING_STATUS)
+## Where's My Spot in Line?
+
+If a customer wants to know their position:
+
+```
+When someone asks "where am I in line?":
+    1. Take their ticket number and look it up
+    2. Find their customer ID
+    3. If they're not in the system, they're not in line (position = 0)
+    4. If they are there, count how many people are ahead of them
+    5. Tell them their position
 ```
 
-## Delete Record
+---
 
-```pseudocode
-function delete_record(record_id):
-    validated_id = validate_record_id(record_id)
-    record = repository.record_by_id(validated_id)
-    if record is None:
-        return None
+## Removing Someone from the Queue
 
-    repository.delete_by_id(validated_id)
-    return record
+Maybe they changed their mind or we need to remove a record:
+
+```
+When we need to delete a customer:
+    1. Make sure the ID number is valid
+    2. Look them up in the database
+    3. If they don't exist, say "I can't find them"
+    4. If they do exist, remove them
+    5. Tell the staff what we removed
 ```
 
-## Clear All Records
+---
 
-```pseudocode
-function clear_all_records():
-    total = repository.count_records()
-    if total > 0:
-        repository.clear_all_records()
-    return total
+## Starting Fresh
+
+When we need to clear everything out:
+
+```
+When we want to wipe the database clean:
+    1. Count how many customers are in the system
+    2. If there are any, delete them all
+    3. Return how many we deleted (so staff knows something happened)
 ```
 
-## Exported Service Functions
+---
 
-The module exposes helper functions that call the shared queue service instance:
+## What the System Exposes to Users
 
-- `join_queue(name)`
-- `call_next()`
-- `mark_done()`
-- `get_waiting()`
-- `get_serving()`
-- `get_history()`
-- `get_all_records()`
-- `count_waiting()`
-- `get_stats()`
-- `get_waiting_position(ticket)`
-- `delete_record(record_id)`
-- `clear_all_records()`
+These are all the commands the staff can use:
+
+- Join queue with a name
+- Call the next customer
+- Mark someone as done
+- View waiting customers
+- View current customer being served
+- View completed customers
+- View everyone (all statuses)
+- Count how many are waiting
+- Get statistics/summary
+- Check position in line
+- Delete a customer record
+- Clear all records

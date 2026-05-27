@@ -7,9 +7,11 @@ A Python-based queue management system with database persistence, featuring a co
 - [Jex Malibiran](https://github.com/Yukihira-Kurozawa/My-Profile-)
 - [Jeremih Gianzon](https://github.com/daylighttg/IT1C_Portfolio_Gianzon)
 - [Zyrenne Lucero](https://github.com/dokidawn/dokidawn)
+- [Aira Segovia]
+
+
 ## Features
 
-- **Multiple Interfaces**: Choose between CLI or REST API based on your needs
 - **Real-time Queue Management**: Join, call, and complete queue entries instantly
 - **Persistent Storage**: SQLite database ensures data survives system restarts
 - **Full History Tracking**: View complete records of all queue activities
@@ -27,7 +29,7 @@ Queue System/
 │   └── pseudocode.md       # Pseudocode
 ├── images/                 # Visual assets
 ├── source/                 # Application source code
-│   ├── main.py             # CLI entry point
+│   ├── main.py             # GUI entry point
 │   ├── requirements.txt    # Python dependencies
 │   ├── queue_system.db     # SQLite database file (created on first run)
 │   ├── core/               # Shared business logic & data layer
@@ -45,7 +47,7 @@ Queue System/
 ### Module Descriptions (in `source/`)
 
 - **`core/database.py`** — Manages SQLite connection and creates tables on first run. The database file (`queue_system.db`) is stored at the `source/` root.
-- **`core/queue_logic.py`** — Pure business-logic functions that return data (no printing). Shared by CLI and API to eliminate code duplication.
+- **`core/queue_logic.py`** — Pure business-logic functions that return data (no printing). Shared by GUI and API to eliminate code duplication.
 - **`api/server.py`** — Flask REST server exposing the queue system over HTTP on port 5000.
 - **`main.py`** — Interactive command-line interface with menu system.
 - **`core/exceptions.py`** — Custom exceptions used across the application.
