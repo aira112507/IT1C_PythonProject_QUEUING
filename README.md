@@ -7,7 +7,8 @@ A Python-based queue management system with database persistence, featuring a co
 - [Jex Malibiran](https://github.com/Yukihira-Kurozawa/My-Profile-)
 - [Jeremih Gianzon](https://github.com/daylighttg/IT1C_Portfolio_Gianzon)
 - [Zyrenne Lucero](https://github.com/dokidawn/dokidawn)
-- [Aira Segovia]
+- [Aira Segovia](https://github.com/aira112507/readme-)
+- [Annadel Apolinario](https://github.com/anadelbagona/Ana)
 
 
 ## Features
